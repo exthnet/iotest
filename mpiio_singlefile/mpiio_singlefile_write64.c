@@ -64,7 +64,7 @@ int main (int argc, char **argv)
   MPI_Reduce(&d2, &dmin, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
   MPI_Reduce(&d2, &dmax, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
   MPI_Reduce(&d2, &dsum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-  if(rank==0)printf("mpiio_singlefile_write64: min %.2f sec, max %.2f sec, avg %.2f sec\n", dmin, dmax, dsum/(double)nranks);
+  if(rank==0)printf("mpiio_singlefile_write64: min %.4f sec, max %.4f sec, avg %.4f sec\n", dmin, dmax, dsum/(double)nranks);
 
   free(data);
   MPI_Finalize();
