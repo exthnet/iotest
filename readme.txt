@@ -1,5 +1,6 @@
 - build
 mkdir workdir
+cd workdir
 cp ../template/build.sh .
 edit build.sh
 ./build.sh
