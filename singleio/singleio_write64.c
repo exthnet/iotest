@@ -31,9 +31,10 @@ int main(int argc, char **argv)
   MPI_Comm_size (MPI_COMM_WORLD, &nranks);
   MPI_Get_processor_name(name, &name_len);
   printf("%d/%d %s, %d elements, %d KByte, %s_*.dat\n", rank, nranks, name, nelems, (nelems/1000)*8, fname); fflush(stdout);
-  if(nranks!=nprocs){printf("nranks != nprocs\n"); fflush(stdout); return -1;}
+  if(nranks!=nprocs){printf("nranks != nprocs\n"); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
 
   data = (double*)malloc(sizeof(double)*nelems);
+  if(data==NULL){printf("malloc failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
   for(i=0; i<nelems; i++){
 	data[i] = (double)(i%0x100) + (double)rank*0.01;
   }
@@ -49,24 +50,28 @@ int main(int argc, char **argv)
 	{
 	  snprintf(fname2, 0xff, "%s_%d.dat", fname, 0);
 	  F = fopen(fname2, "w");
-	  if(F==NULL){printf("failed to open %s for write\n", fname2); fflush(stdout); return -1;}
+	  if(F==NULL){printf("failed to open %s for write (rank %d)\n", fname2, rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
 	  ret = fwrite(data, sizeof(double), nelems, F);
 	  fclose(F);
-	  if(ret!=nelems){printf("fwrite failed(%d)\n", ret); fflush(stdout); return -1;}
+	  if(ret!=nelems){printf("fwrite failed (return %d) (rank %d)\n", ret, rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
 	}
 	for(i=1; i<nprocs; i++){
-	  ret = MPI_Recv(data, nelems, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &status);
-	  if(ret!=MPI_SUCCESS){printf("MPI_Recv failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1);}
+	  ret = MPI_Irecv(data, nelems, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &req[i-1]);
+	  if(ret!=MPI_SUCCESS){printf("MPI_Irecv failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
+	  ret = MPI_Wait(&req[i-1], &status);
+	  if(ret!=MPI_SUCCESS){printf("MPI_Wait failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
 	  snprintf(fname2, 0xff, "%s_%d.dat", fname, i);
 	  F = fopen(fname2, "w");
-	  if(F==NULL){printf("failed to open %s for write\n", fname2); fflush(stdout); return -1;}
+	  if(F==NULL){printf("failed to open %s for write (rank %d)\n", fname2, rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
 	  ret = fwrite(data, sizeof(double), nelems, F);
 	  fclose(F);
-	  if(ret!=nelems){printf("fwrite failed(%d)\n", ret); fflush(stdout); return -1;}
+	  if(ret!=nelems){printf("fwrite failed (return %d) (rank %d)\n", ret, rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
 	}
   }else{
-	ret = MPI_Send(data, nelems, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
-	if(ret!=MPI_SUCCESS){printf("MPI_Send failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1);}
+	ret = MPI_Isend(data, nelems, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, req);
+	if(ret!=MPI_SUCCESS){printf("MPI_Isend failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
+	ret = MPI_Wait(req, &status);
+	if(ret!=MPI_SUCCESS){printf("MPI_Wait failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
   }
   d2 = MPI_Wtime() - d1;
   double dmin, dmax, dsum;

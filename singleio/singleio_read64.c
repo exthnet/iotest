@@ -30,9 +30,10 @@ int main(int argc, char **argv)
   MPI_Comm_size (MPI_COMM_WORLD, &nranks);
   MPI_Get_processor_name(name, &name_len);
   printf("%d/%d %s, %d elements, %d KByte, %s_*.dat\n", rank, nranks, name, nelems, (nelems/1000)*8, fname); fflush(stdout);
-  if(nranks!=nprocs){printf("nranks != nprocs\n"); fflush(stdout); return -1;}
+  if(nranks!=nprocs){printf("nranks != nprocs\n"); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
 
   data = (double*)malloc(sizeof(double)*nelems);
+  if(data==NULL){printf("malloc failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
   if(rank==0)req = (MPI_Request*)malloc(sizeof(MPI_Request)*(nprocs-1));
   else req = (MPI_Request*)malloc(sizeof(MPI_Request)*1);
   MPI_Barrier(MPI_COMM_WORLD);
@@ -44,30 +45,29 @@ int main(int argc, char **argv)
 	for(i=1; i<nprocs; i++){
 	  snprintf(fname2, 0xff, "%s_%d.dat", fname, i);
 	  F = fopen(fname2, "r");
-	  if(F==NULL){printf("failed to open %s for read\n", fname2); fflush(stdout); return -1;}
+	  if(F==NULL){printf("failed to open %s for read (proc %d)\n", fname2, rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
 	  ret = fread(data, sizeof(double), nelems, F);
 	  fclose(F);
-	  if(ret!=nelems){printf("fread failed(%d)\n", ret); fflush(stdout); return -1;}
+	  if(ret!=nelems){printf("fread failed (return %d) (proc %d)\n", ret, rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
 	  ret = MPI_Isend(data, nelems, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &req[i-1]);
-	  if(ret!=MPI_SUCCESS){printf("MPI_Isend failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1);}
+	  if(ret!=MPI_SUCCESS){printf("MPI_Isend failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
+	  ret = MPI_Wait(&req[i-1], &status);
+	  if(ret!=MPI_SUCCESS){printf("MPI_Wait failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
 	}
 	// self
 	{
 	  snprintf(fname2, 0xff, "%s_%d.dat", fname, 0);
 	  F = fopen(fname2, "r");
-	  if(F==NULL){printf("failed to open %s for read\n", fname2); fflush(stdout); return -1;}
+	  if(F==NULL){printf("failed to open %s for read (proc %d)\n", fname2, rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
 	  ret = fread(data, sizeof(double), nelems, F);
 	  fclose(F);
-	  if(ret!=nelems){printf("fread failed(%d)\n", ret); fflush(stdout); return -1;}
+	  if(ret!=nelems){printf("fread failed (return %d) (proc %d)\n", ret, rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
 	}
-	// wait
-	ret = MPI_Waitall(nranks-1, req, &status);
-	if(ret!=MPI_SUCCESS){printf("MPI_Waitall failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1);}
   }else{
 	ret = MPI_Irecv(data, nelems, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, req);
-	if(ret!=MPI_SUCCESS){printf("MPI_Irecv failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1);}
+	if(ret!=MPI_SUCCESS){printf("MPI_Irecv failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
 	ret = MPI_Wait(req, &status);
-	if(ret!=MPI_SUCCESS){printf("MPI_Wait failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1);}
+	if(ret!=MPI_SUCCESS){printf("MPI_Wait failed (proc %d)\n", rank); fflush(stdout); MPI_Abort(MPI_COMM_WORLD, -1); return -1;}
   }
   d2 = MPI_Wtime() - d1;
   double dmin, dmax, dsum;
