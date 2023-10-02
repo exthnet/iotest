@@ -26,3 +26,6 @@ see template/*.sh
   job_B_*nodes_local.sh : batch job script for Flow Type II @Nagoya Univ., on local SSD (MPI-IO is not available)
   job_B_*nodes_beeond.sh : batch job script for Flow Type II @Nagoya Univ., on BeeOND storage
 
+
+今後何か更新がある場合はgitlabで行います
+https://gitlab.com/exthnet/iotest
